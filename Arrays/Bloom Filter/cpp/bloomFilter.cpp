@@ -1,11 +1,10 @@
 #include <iostream>
 
 #include "bloomFilter.h"
-#include "../linkedList/linkedListString.h"
 
 using namespace std;
 
-bloomFilter::bloomFilter(int bloomSize)
+bloomFilter::bloomFilter(int bloomSize, int hash_k) : hash_k(hash_k)
 {
     this->bloomSize = bloomSize / sizeof(char) + (bloomSize % sizeof(char) != 0);
     this->array = new char[this->bloomSize];
@@ -50,13 +49,18 @@ int bloomFilter::getSize()
     return this->bloomSize * sizeof(char) * 8;
 }
 
+int bloomFilter::getNumberOfHashes()
+{
+    return this->hash_k;
+}
+
 unsigned long djb2(char *str)
 {
     unsigned long hash = 5381;
     int c;
     while (c = *str++)
     {
-        hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
+        hash = ((hash << 5) + hash) + c;
     }
     return hash;
 }
@@ -83,12 +87,11 @@ void bloomFilter::add(int number)
 {
     char numberstring[4];
     sprintf(numberstring, "%d", number);
-    int K = 16;
-    for (int i = 0; i < K; i++)
+
+    for (int i = 0; i < this->getNumberOfHashes(); i++)
     {
         int bit = hash_i(numberstring, i) % this->getSize();
         this->setBit(bit, 1);
-        // cout << "hash_" << i << " of " << numberstring << " is " << bit << endl;
     }
 }
 
@@ -96,9 +99,9 @@ int bloomFilter::check(int number)
 {
     char numberstring[4];
     sprintf(numberstring, "%d", number);
-    int K = 16;
+
     int flag = 1;
-    for (int i = 0; i < K; i++)
+    for (int i = 0; i < this->getNumberOfHashes(); i++)
     {
         int bit = hash_i(numberstring, i) % this->getSize();
         if (!this->getBit(bit))
@@ -106,59 +109,30 @@ int bloomFilter::check(int number)
             flag = 0;
             break;
         }
-        // cout << "hash_" << i << " of " << numberstring << " is " << bit << endl;
     }
     return flag;
 }
 
-bloomFilterList::bloomFilterList(int bloomSize) : bloomSize(bloomSize)
+void bloomFilter::add(char *str)
 {
-    this->next = NULL;
-    this->bloom = NULL;
-    this->virus = NULL;
-}
-
-bloomFilterList::bloomFilterList(linkedListStringNode *virus, int bloomSize) : bloomSize(bloomSize), virus(virus)
-{
-    this->bloom = new bloomFilter(this->bloomSize);
-    this->next = NULL;
-}
-
-bloomFilterList::~bloomFilterList()
-{
-    if (this->bloom != NULL)
+    for (int i = 0; i < this->getNumberOfHashes(); i++)
     {
-        delete this->bloom;
-    }
-    if (this->next != NULL)
-    {
-        delete this->next;
+        int bit = hash_i(str, i) % this->getSize();
+        this->setBit(bit, 1);
     }
 }
 
-bloomFilterList *bloomFilterList::add(linkedListStringNode *virus)
+int bloomFilter::check(char *str)
 {
-    if (this->virus == NULL)
+    int flag = 1;
+    for (int i = 0; i < this->getNumberOfHashes(); i++)
     {
-        this->virus = virus;
-        this->bloom = new bloomFilter(this->bloomSize);
-        return this;
-    }
-    bloomFilterList *new_node = new bloomFilterList(virus, this->bloomSize);
-    new_node->next = this;
-    return new_node;
-}
-
-bloomFilter *bloomFilterList::getBloom(linkedListStringNode *virus)
-{
-    bloomFilterList *temp = this;
-    while (temp != NULL)
-    {
-        if (temp->virus->getString().compare(virus->getString()) == 0)
+        int bit = hash_i(str, i) % this->getSize();
+        if (!this->getBit(bit))
         {
-            return temp->bloom;
+            flag = 0;
+            break;
         }
-        temp = temp->next;
     }
-    return NULL;
+    return flag;
 }
